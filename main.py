@@ -1,29 +1,36 @@
+# main.py
+from flask import Flask, request, jsonify
 from facebook_scraper import get_posts
-import csv
-from datetime import datetime
 
-# Exemple : scraper les posts d'une page Facebook publique
-def scrape_facebook(page="meme_page", max_posts=10):
-    posts_data = []
-    for post in get_posts(page, pages=1):  # pages=1 = une "page" de scroll
-        posts_data.append({
-            "time": post['time'],
-            "text": post['text'],
-            "likes": post['likes'],
-            "comments": post['comments'],
-            "shares": post['shares']
-        })
-        if len(posts_data) >= max_posts:
-            break
+app = Flask(__name__)
 
-    # Sauvegarde CSV
-    filename = f"output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    with open(filename, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=posts_data[0].keys())
-        writer.writeheader()
-        writer.writerows(posts_data)
+@app.route("/")
+def home():
+    return "✅ Facebook Scraper API est en ligne !"
 
-    print(f"✅ Données sauvegardées dans {filename}")
+@app.route("/scrape", methods=["GET"])
+def scrape():
+    # Récupère la page à scraper (ex: conneriesqc)
+    page = request.args.get("page")
+    if not page:
+        return jsonify({"error": "Merci de fournir ?page=nom_de_page"}), 400
+
+    try:
+        posts_data = []
+        for post in get_posts(page, pages=1, options={"comments": False}):
+            posts_data.append({
+                "post_id": post.get("post_id"),
+                "text": post.get("text"),
+                "time": str(post.get("time")),
+                "likes": post.get("likes"),
+                "shares": post.get("shares"),
+                "comments": post.get("comments"),
+                "post_url": post.get("post_url")
+            })
+        return jsonify(posts_data)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    scrape_facebook("conneriesqc", 10)
+    app.run(host="0.0.0.0", port=8080)
